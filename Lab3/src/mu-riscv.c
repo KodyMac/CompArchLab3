@@ -319,71 +319,6 @@ void load_program() {
 
 
 
-void handle_r_type() {
-	
-	uint8_t rd = bincmd >> 7 & BIT_MASK_5;
-	uint8_t funct3 = bincmd >> 12 & BIT_MASK_3;
-	uint8_t rs1 = bincmd >> 15 & BIT_MASK_5;
-	uint8_t rs2 = bincmd >> 20 & BIT_MASK_5;
-	uint8_t funct7 = bincmd >> 25 & BIT_MASK_7;
-	switch(funct3) {
-		case 0x0:
-			switch(funct7){
-				case 0x0:
-				//add 
-					print_r_cmd("add", rd, rs1, rs2);
-					break;
-				case 0x20:
-				//sub 
-					print_r_cmd("sub", rd, rs1, rs2);
-					break;
-				default:
-					break;
-			}
-			break;
-		case 0x1:
-			print_r_cmd("sll", rd, rs1, rs2);
-			break;
-		case 0x2:
-			print_r_cmd("slt", rd, rs1, rs2);
-			break;
-		case 0x3:
-			print_r_cmd("sltu", rd, rs1, rs2);
-			break;
-		case 0x4:
-			print_r_cmd("xor", rd, rs1, rs2);
-			break;
-		case 0x5:
-			switch(funct7){
-				case 0x0:
-					print_r_cmd("srl", rd, rs1, rs2);
-					break;
-				case 0x20:
-					print_r_cmd("sra", rd, rs1, rs2);
-					break;
-				default:
-					printf("No funct7(%d) for funct3(%d) found for R-type.", funct7, funct3);
-					break;
-			}
-			break;
-		case 0x6:
-			print_r_cmd("or", rd, rs1, rs2);
-			break;
-		case 0x7:
-			print_r_cmd("and", rd, rs1, rs2);
-			break;
-		default:
-			printf("Unknown funct3(%d) in R-type", funct3);
-			break;
-	}
-}
-
-
-handle_s_type()
-
-
-
-
 
 
 
@@ -430,7 +365,10 @@ void WB()
 //Other instructions will skip this stage
 void MEM()
 {
-	
+	/*if load
+		read data from memory address from EX and put it in LMD (load memory data) register
+	if store
+		write value stored in register B? into memory at address calculated fromggg*/
 }
 
 /************************************************************/
@@ -441,7 +379,7 @@ void MEM()
 //Load/Store? lw x2, x3, 32 -> Compute address
 void EX()
 {
-	MEM_STATE.ALUOutput = 0; /*IMPLEMENT THIS*/
+	
 }
 
 /************************************************************/
@@ -453,7 +391,7 @@ void EX()
 //(0, 1, or 2 reads for jump, addi, or add, respectively)
 void ID()
 {
-
+		uint8_t bincmd = IF_ID.IR;
 		if(bincmd) {
 		uint8_t opcode = GET_OPCODE(bincmd);
 		switch (opcode) {
@@ -461,8 +399,9 @@ void ID()
 				uint8_t rd = bincmd >> 7 & BIT_MASK_5;
 				uint8_t rs1 = bincmd >> 15 & BIT_MASK_5;
 				uint8_t rs2 = bincmd >> 20 & BIT_MASK_5;
-				.A = CURRENT_STATE.REGS[rs1];
-				CURRENT_STATE.B = CURRENT_STATE.REGS[rs2];
+				ID_EX.IR = IF_ID.IR;
+				ID_EX.A = CURRENT_STATE.REGS[rs1];
+				ID_EX.B = CURRENT_STATE.REGS[rs2];
 
 				
 				break;
@@ -475,30 +414,35 @@ void ID()
     
 				uint8_t rs1 = bincmd >> 15 & BIT_MASK_5;
 				uint8_t rs2 = bincmd >> 20 & BIT_MASK_5;
-				CURRENT_STATE.A = CURRENT_STATE.REGS[rs1];
-				CURRENT_STATE.B = CURRENT_STATE.REGS[rs2];
-				CURRENT_STATE.imm = imm;
+				ID_EX.IR = IF_ID.IR;
+				ID_EX.A = CURRENT_STATE.REGS[rs1];
+				ID_EX.B = CURRENT_STATE.REGS[rs2];
+				ID_EX.imm = imm;
 				break;
 			}
-			case IMM_ALU_OPCODE:
+			case IMM_ALU_OPCODE:{
 				//type iinstructions have imm in bits 31:20, so we can just shift right 20 to get the imm
 				uint16_t imm = bincmd >> 20 & (BIT_MASK_12);
 				uint8_t rd = bincmd >> 7 & BIT_MASK_5;
 
 				uint8_t rs1 = bincmd >> 15 & BIT_MASK_5;
 				
-				CURRENT_STATE.A = CURRENT_STATE.REGS[rs1];
-				CURRENT_STATE.imm = imm;
+				ID_EX.IR = IF_ID.IR;
+				ID_EX.A = CURRENT_STATE.REGS[rs1];
+				ID_EX.imm = imm;
 				break;
-			case LOAD_OPCODE:
+			}
+			case LOAD_OPCODE:{
 				uint16_t imm = bincmd >> 20 & (BIT_MASK_12);
 				uint8_t rd = bincmd >> 7 & BIT_MASK_5;
 
 				uint8_t rs1 = bincmd >> 15 & BIT_MASK_5;
 				
-				CURRENT_STATE.A = CURRENT_STATE.REGS[rs1];
-				CURRENT_STATE.imm = imm;
+				ID_EX.IR = IF_ID.IR;
+				ID_EX.A = CURRENT_STATE.REGS[rs1];
+				ID_EX.imm = imm;
 				break;
+			}
 			case BRANCH_OPCODE:
 				break;
 			case JUMP_OPCODE:
