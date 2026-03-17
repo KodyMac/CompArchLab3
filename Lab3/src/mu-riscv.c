@@ -309,6 +309,87 @@ void load_program() {
 	fclose(fp);
 }
 
+
+
+
+
+
+
+
+
+
+
+void handle_r_type() {
+	
+	uint8_t rd = bincmd >> 7 & BIT_MASK_5;
+	uint8_t funct3 = bincmd >> 12 & BIT_MASK_3;
+	uint8_t rs1 = bincmd >> 15 & BIT_MASK_5;
+	uint8_t rs2 = bincmd >> 20 & BIT_MASK_5;
+	uint8_t funct7 = bincmd >> 25 & BIT_MASK_7;
+	switch(funct3) {
+		case 0x0:
+			switch(funct7){
+				case 0x0:
+				//add 
+					print_r_cmd("add", rd, rs1, rs2);
+					break;
+				case 0x20:
+				//sub 
+					print_r_cmd("sub", rd, rs1, rs2);
+					break;
+				default:
+					break;
+			}
+			break;
+		case 0x1:
+			print_r_cmd("sll", rd, rs1, rs2);
+			break;
+		case 0x2:
+			print_r_cmd("slt", rd, rs1, rs2);
+			break;
+		case 0x3:
+			print_r_cmd("sltu", rd, rs1, rs2);
+			break;
+		case 0x4:
+			print_r_cmd("xor", rd, rs1, rs2);
+			break;
+		case 0x5:
+			switch(funct7){
+				case 0x0:
+					print_r_cmd("srl", rd, rs1, rs2);
+					break;
+				case 0x20:
+					print_r_cmd("sra", rd, rs1, rs2);
+					break;
+				default:
+					printf("No funct7(%d) for funct3(%d) found for R-type.", funct7, funct3);
+					break;
+			}
+			break;
+		case 0x6:
+			print_r_cmd("or", rd, rs1, rs2);
+			break;
+		case 0x7:
+			print_r_cmd("and", rd, rs1, rs2);
+			break;
+		default:
+			printf("Unknown funct3(%d) in R-type", funct3);
+			break;
+	}
+}
+
+
+handle_s_type()
+
+
+
+
+
+
+
+
+
+
 /************************************************************/
 /* maintain the pipeline                                                                                           */
 /************************************************************/
@@ -333,6 +414,10 @@ void handle_pipeline()
 /************************************************************/
 /* writeback (WB) pipeline stage:                                                                          */
 /************************************************************/
+//Write to register file
+//• For arithmetic ops, logic, shift, etc, load. What about stores?
+//Update PC
+//• For branches, jumps
 void WB()
 {
 
@@ -341,6 +426,8 @@ void WB()
 /************************************************************/
 /* memory access (MEM) pipeline stage:                                                          */
 /************************************************************/
+//Used by load and store instructions only
+//Other instructions will skip this stage
 void MEM()
 {
 	
@@ -349,6 +436,9 @@ void MEM()
 /************************************************************/
 /* execution (EX) pipeline stage:                                                                          */
 /************************************************************/
+//Useful work done here (+, -, *, /), shift, logic
+//operation, comparison (slt)
+//Load/Store? lw x2, x3, 32  Compute address
 void EX()
 {
 	
@@ -357,8 +447,69 @@ void EX()
 /************************************************************/
 /* instruction decode (ID) pipeline stage:                                                         */
 /************************************************************/
+//Gather data from the instruction
+//Read opcode; determine instruction type, field lengths
+//Read in data from register file
+//(0, 1, or 2 reads for jump, addi, or add, respectively)
 void ID()
 {
+
+		if(bincmd) {
+		uint8_t opcode = GET_OPCODE(bincmd);
+		switch (opcode) {
+			case R_OPCODE:{
+				uint8_t rd = bincmd >> 7 & BIT_MASK_5;
+				uint8_t rs1 = bincmd >> 15 & BIT_MASK_5;
+				uint8_t rs2 = bincmd >> 20 & BIT_MASK_5;
+				CURRENT_STATE.A = CURRENT_STATE.REGS[rs1];
+				CURRENT_STATE.B = CURRENT_STATE.REGS[rs2];
+
+				
+				break;
+			}
+			case STORE_OPCODE:{
+				//s type imm is split into two parts, imm[4:0] and imm[11:5], so we have to combine them to get the full imm
+				uint8_t imm4 = bincmd >> 7 & BIT_MASK_5;
+				uint8_t imm11 = bincmd >> 25 & BIT_MASK_7;
+				uint8_t imm = (imm11 << 5) | imm4;
+    
+				uint8_t rs1 = bincmd >> 15 & BIT_MASK_5;
+				uint8_t rs2 = bincmd >> 20 & BIT_MASK_5;
+				CURRENT_STATE.A = CURRENT_STATE.REGS[rs1];
+				CURRENT_STATE.B = CURRENT_STATE.REGS[rs2];
+				CURRENT_STATE.imm = imm;
+				break;
+			}
+			case IMM_ALU_OPCODE:
+				//type iinstructions have imm in bits 31:20, so we can just shift right 20 to get the imm
+				uint16_t imm = bincmd >> 20 & (BIT_MASK_12);
+				uint8_t rd = bincmd >> 7 & BIT_MASK_5;
+
+				uint8_t rs1 = bincmd >> 15 & BIT_MASK_5;
+				
+				CURRENT_STATE.A = CURRENT_STATE.REGS[rs1];
+				CURRENT_STATE.imm = imm;
+				break;
+			case LOAD_OPCODE:
+				uint16_t imm = bincmd >> 20 & (BIT_MASK_12);
+				uint8_t rd = bincmd >> 7 & BIT_MASK_5;
+
+				uint8_t rs1 = bincmd >> 15 & BIT_MASK_5;
+				
+				CURRENT_STATE.A = CURRENT_STATE.REGS[rs1];
+				CURRENT_STATE.imm = imm;
+				break;
+			case BRANCH_OPCODE:
+				break;
+			case JUMP_OPCODE:
+				break;
+			default:
+				printf("Unknown command!");
+				break;
+		}
+	}
+
+
 	
 }
 
@@ -369,9 +520,14 @@ void IF()
 {
 	// Fetch the instruction at the current PC.
     
+	CURRENT_STATE.IR = mem_read_32(CURRENT_STATE.PC);
+
+
     // Store the fetched instruction in the IR for the next state.
 
     // Increment the PC by 4 to point to the next instruction.
+
+	CURRENT_STATE.PC += 4;
 }
 
 
