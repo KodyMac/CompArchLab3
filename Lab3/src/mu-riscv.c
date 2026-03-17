@@ -438,10 +438,10 @@ void MEM()
 /************************************************************/
 //Useful work done here (+, -, *, /), shift, logic
 //operation, comparison (slt)
-//Load/Store? lw x2, x3, 32  Compute address
+//Load/Store? lw x2, x3, 32 -> Compute address
 void EX()
 {
-	
+	MEM_STATE.ALUOutput = 0; /*IMPLEMENT THIS*/
 }
 
 /************************************************************/
@@ -461,7 +461,7 @@ void ID()
 				uint8_t rd = bincmd >> 7 & BIT_MASK_5;
 				uint8_t rs1 = bincmd >> 15 & BIT_MASK_5;
 				uint8_t rs2 = bincmd >> 20 & BIT_MASK_5;
-				CURRENT_STATE.A = CURRENT_STATE.REGS[rs1];
+				.A = CURRENT_STATE.REGS[rs1];
 				CURRENT_STATE.B = CURRENT_STATE.REGS[rs2];
 
 				
@@ -520,14 +520,14 @@ void IF()
 {
 	// Fetch the instruction at the current PC.
     
-	CURRENT_STATE.IR = mem_read_32(CURRENT_STATE.PC);
+	IF_ID.IR = mem_read_32(CURRENT_STATE.PC);
 
 
     // Store the fetched instruction in the IR for the next state.
 
     // Increment the PC by 4 to point to the next instruction.
 
-	CURRENT_STATE.PC += 4;
+	IF_ID.PC += 4;
 }
 
 
