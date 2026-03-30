@@ -365,10 +365,61 @@ void WB()
 //Other instructions will skip this stage
 void MEM()
 {
-	/*if load
-		read data from memory address from EX and put it in LMD (load memory data) register
-	if store
-		write value stored in register B? into memory at address calculated fromggg*/
+	uint32_t bincmd = EX_MEM.IR;
+	if (!bincmd) { MEM_WB.IR = 0; return; }
+	uint8_t opcode = GET_OPCODE(bincmd);
+	uint8_t funct3 = GET_FUNCT3(bincmd);
+	MEM_WB.IR = EX_MEM.IR;
+	MEM_WB.ALUOutput = EX_MEM.ALUOutput;
+
+	switch(opcode) {
+		case LOAD_OPCODE: {
+			uint32_t addr = EX_MEM.ALUOutput;
+			uint32_t word = mem_read_32(addr);
+			switch(funct3) {
+				case 0x0: {
+					MEM_WB.LMD = (int32_t)(int8_t)(word & 0xFF); //LB - sign extend byte
+					break;
+				}
+				case 0x1: { //LH - sign extend half word
+					MEM_WB.LMD = (int32_t)(int16_t)(word & 0xFFFF);
+					break;
+				}
+				case 0x2: { //LW - just read word
+					MEM_WB.LMD = word;
+					break;
+				}
+				case 0x4: { //LBU - zero extend byte
+					MEM_WB.LMD = word & 0xFF;
+					break;
+				}
+				case 0x5: { //LHU - zero extend half word
+					MEM_WB.LMD = word & 0xFFFF;
+					break;
+				}
+			}
+			break;
+		}
+		case STORE_OPCODE: {
+			uint32_t addr = EX_MEM.ALUOutput;
+			switch (funct3) {
+				case 0x0: //sb
+					mem_write_32(addr, EX_MEM.B & 0xFF);
+					break;
+				case 0x1: //sh
+					mem_write_32(addr, EX_MEM.B & 0xFFFF);
+					break;
+				case 0x2: //sw
+					mem_write_32(addr, EX_MEM.B);
+					break;
+			}
+			break;
+		}
+		default: {
+			MEM_WB.LMD = 0;
+			break;
+		}
+	}
 }
 
 /************************************************************/
