@@ -401,8 +401,25 @@ void EX()
 			break;
 		}
 		case IMM_ALU_OPCODE: {
-			
+			switch(funct3) {
+				case 0x0: EX_MEM.ALUOutput = ID_EX.A + ID_EX.imm; break; //addi
+				case 0x1: EX_MEM.ALUOutput = ID_EX.A << (ID_EX.imm & 0x1F); break; //slli
+				case 0x2: EX_MEM.ALUOutput = ((int32_t)ID_EX.A < (int32_t)ID_EX.imm) ? 1:0; break; //slti
+				case 0x3: EX_MEM.ALUOutput = (ID_EX.A < ID_EX.imm) ? 1:0; break; //sltiu
+				case 0x4: EX_MEM.ALUOutput = ID_EX.A ^ ID_EX.imm; break; //xori
+				case 0x5: EX_MEM.ALUOutput = (ID_EX.imm >> 5 == 0) ? ID_EX.A >> (ID_EX.imm & 0x1F) : (int32_t)ID_EX.A >> (ID_EX.imm & 0x1F); break; //srli/srai
+				case 0x6: EX_MEM.ALUOutput = ID_EX.A | ID_EX.imm; break; //ori
+				case 0x7: EX_MEM.ALUOutput = ID_EX.A & ID_EX.imm; break; //andi
+			}
+			break;
 		}
+		case LOAD_OPCODE:
+		case STORE_OPCODE: 
+			EX_MEM.ALUOutput = ID_EX.A + ID_EX.imm; //calculate address for load/store
+			break;
+		default:
+			EX_MEM.ALUOutput = 0;
+			break;
 	}
 }
 
