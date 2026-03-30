@@ -379,7 +379,31 @@ void MEM()
 //Load/Store? lw x2, x3, 32 -> Compute address
 void EX()
 {
-	
+	uint32_t bincmd = ID_EX.IR;
+	if (!bincmd) { EX_MEM.IR = 0; return; }
+	uint8_t opcode = GET_OPCODE(bincmd);
+	uint8_t funct3 = GET_FUNCT3(bincmd);
+	uint8_t funct7 = (bincmd >> 25) & BIT_MASK_7;
+	EX_MEM.IR = ID_EX.IR;
+	EX_MEM.B = ID_EX.B; //pass b for store instructions
+	switch(opcode) {
+		case R_OPCODE: {
+			switch(funct3) {
+				case 0x0: EX_MEM.ALUOutput = (funct7 == 0x20) ? ID_EX.A - ID_EX.B : ID_EX.A + ID_EX.B; break; //add/sub
+				case 0x1: EX_MEM.ALUOutput = ID_EX.A << (ID_EX.B & 0x1F); break; //sll
+				case 0x2: EX_MEM.ALUOutput = ((int32_t)ID_EX.A < (int32_t)ID_EX.B) ? 1:0; break; //slt
+				case 0x3: EX_MEM.ALUOutput = (ID_EX.A < ID_EX.B) ? 1:0; break; //sltu
+				case 0x4: EX_MEM.ALUOutput = ID_EX.A ^ ID_EX.B; break; //xor
+				case 0x5: EX_MEM.ALUOutput = (funct7 == 0x20) ? (int32_t)ID_EX.A >> (ID_EX.B & 0x1F) : ID_EX.A >> (ID_EX.B & 0x1F); break; //srl/sra
+				case 0x6: EX_MEM.ALUOutput = ID_EX.A | ID_EX.B; break; //or
+				case 0x7: EX_MEM.ALUOutput = ID_EX.A & ID_EX.B; break; //and
+			}
+			break;
+		}
+		case IMM_ALU_OPCODE: {
+			
+		}
+	}
 }
 
 /************************************************************/
@@ -392,28 +416,79 @@ void EX()
 void ID()
 {
 		uint8_t bincmd = IF_ID.IR;
-		if(bincmd) {
+		if (!bincmd) return;
 		uint8_t opcode = GET_OPCODE(bincmd);
+		uint8_t rs1 =0, rs2 = 0, rd= 0;
 		switch (opcode) {
-			case R_OPCODE:{
-				uint8_t rd = bincmd >> 7 & BIT_MASK_5;
-				uint8_t rs1 = bincmd >> 15 & BIT_MASK_5;
-				uint8_t rs2 = bincmd >> 20 & BIT_MASK_5;
+			case R_OPCODE: {
+				rd = (bincmd >> 7) & BIT_MASK_5;
+				rs1 = (bincmd >> 15) & BIT_MASK_5;
+				rs2 = (bincmd >> 20) & BIT_MASK_5;
 				ID_EX.IR = IF_ID.IR;
 				ID_EX.A = CURRENT_STATE.REGS[rs1];
 				ID_EX.B = CURRENT_STATE.REGS[rs2];
-
+				break;
+			}
+			case IMM_ALU_OPCODE: {
+				uint32_t imm = (bincmd >> 20) & BIT_MASK_12;
+				if(imm & 0x800) imm |= 0xFFFFF000; // sign extend imm
+				uint8_t rs1 = (bincmd >> 15) & BIT_MASK_5;
+				ID_EX.IR = IF_ID.IR;
+				ID_EX.A = CURRENT_STATE.REGS[rs1];
+				ID_EX.imm = imm;
+				break;
+			}
+			case LOAD_OPCODE: {
+				uint32_t imm = (bincmd >> 20) & BIT_MASK_12;
+				if (imm & 0x800) imm |= 0xFFFFF000;
+				uint8_t rs1 = (bincmd >> 15) & BIT_MASK_5;
+				ID_EX.IR = IF_ID.IR;
+				ID_EX.A = CURRENT_STATE.REGS[rs1];
+				ID_EX.imm = imm;
+				break;
+			}
+			case STORE_OPCODE: {
+				uint8_t imm4 = (bincmd >> 7) & BIT_MASK_5;
+				uint8_t imm11 = (bincmd >> 25) & BIT_MASK_7;
+				uint32_t imm = (imm11 << 5) | imm4;
+				if(imm & 0x800) imm |= 0xFFFFF000;
+				uint8_t rs1 = (bincmd >> 15) & BIT_MASK_5;
+				uint8_t rs2 = (bincmd >> 20) & BIT_MASK_5;
+				ID_EX.IR = IF_ID.IR;
+				ID_EX.A = CURRENT_STATE.REGS[rs1];
+				ID_EX.B = CURRENT_STATE.REGS[rs2];
+				ID_EX.imm = imm;
+				break;
+			}
+			case BRANCH_OPCODE:
+			case JUMP_OPCODE:
+				break;
+			default:
+				printf("Unknown command");
+				break;
+		}
+		/*if(bincmd) {
+		uint8_t opcode = GET_OPCODE(bincmd);
+		switch (opcode) {
+			case R_OPCODE:{
+				uint8_t rd = (bincmd >> 7) & BIT_MASK_5;
+				uint8_t rs1 = (bincmd >> 15) & BIT_MASK_5;
+				uint8_t rs2 = (bincmd >> 20) & BIT_MASK_5;
+				ID_EX.IR = IF_ID.IR;
+				ID_EX.A = CURRENT_STATE.REGS[rs1];
+				ID_EX.B = CURRENT_STATE.REGS[rs2];
+				ID_EX.imm = 0;
 				
 				break;
 			}
 			case STORE_OPCODE:{
 				//s type imm is split into two parts, imm[4:0] and imm[11:5], so we have to combine them to get the full imm
-				uint8_t imm4 = bincmd >> 7 & BIT_MASK_5;
-				uint8_t imm11 = bincmd >> 25 & BIT_MASK_7;
+				uint8_t imm4 = (bincmd) >> 7 & BIT_MASK_5;
+				uint8_t imm11 = (bincmd) >> 25 & BIT_MASK_7;
 				uint8_t imm = (imm11 << 5) | imm4;
     
-				uint8_t rs1 = bincmd >> 15 & BIT_MASK_5;
-				uint8_t rs2 = bincmd >> 20 & BIT_MASK_5;
+				uint8_t rs1 = (bincmd >> 15) & BIT_MASK_5;
+				uint8_t rs2 = (bincmd >> 20) & BIT_MASK_5;
 				ID_EX.IR = IF_ID.IR;
 				ID_EX.A = CURRENT_STATE.REGS[rs1];
 				ID_EX.B = CURRENT_STATE.REGS[rs2];
@@ -422,10 +497,9 @@ void ID()
 			}
 			case IMM_ALU_OPCODE:{
 				//type iinstructions have imm in bits 31:20, so we can just shift right 20 to get the imm
-				uint16_t imm = bincmd >> 20 & (BIT_MASK_12);
-				uint8_t rd = bincmd >> 7 & BIT_MASK_5;
-
-				uint8_t rs1 = bincmd >> 15 & BIT_MASK_5;
+				uint16_t imm = (bincmd >> 20) & (BIT_MASK_12);
+				uint8_t rd = (bincmd >> 7) & BIT_MASK_5;
+				uint8_t rs1 = (bincmd >> 15) & BIT_MASK_5;
 				
 				ID_EX.IR = IF_ID.IR;
 				ID_EX.A = CURRENT_STATE.REGS[rs1];
@@ -454,8 +528,8 @@ void ID()
 	}
 
 
-	
-}
+	*/
+} 
 
 /************************************************************/
 /* instruction fetch (IF) pipeline stage:                                                              */
@@ -465,13 +539,14 @@ void IF()
 	// Fetch the instruction at the current PC.
     
 	IF_ID.IR = mem_read_32(CURRENT_STATE.PC);
-
+	IF_ID.PC = CURRENT_STATE.PC;
+	CURRENT_STATE.PC += 4;
 
     // Store the fetched instruction in the IR for the next state.
 
     // Increment the PC by 4 to point to the next instruction.
 
-	IF_ID.PC += 4;
+	
 }
 
 
