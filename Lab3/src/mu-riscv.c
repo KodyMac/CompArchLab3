@@ -355,7 +355,30 @@ void handle_pipeline()
 //• For branches, jumps
 void WB()
 {
+	uint32_t bincmd = MEM_WB.IR;
+	if (!bincmd) return;
+	uint8_t opcode = GET_OPCODE(bincmd);
+	uint8_t rd = (bincmd >> 7) & BIT_MASK_5;
 
+	switch (opcode) {
+		case R_OPCODE:
+		case IMM_ALU_OPCODE:
+			if (rd != 0)
+				CURRENT_STATE.REGS[rd] = MEM_WB.ALUOutput;
+			INSTRUCTION_COUNT++;
+			break;
+		case LOAD_OPCODE:
+			if (rd != 0)
+				CURRENT_STATE.REGS[rd] = MEM_WB.LMD;
+			INSTRUCTION_COUNT++;
+			break;
+		case STORE_OPCODE:
+			INSTRUCTION_COUNT++;
+			break;
+		default:
+			break;
+			
+	}
 }
 
 /************************************************************/
@@ -911,7 +934,12 @@ void print_b_cmd(char* cmd_name, uint8_t rs1, uint8_t rs2, uint16_t imm) {
 /************************************************************/
 void show_pipeline()
 {
+	print("Current PC: 0x%08x\n\n", CURRENT_STATE.PC);
 
+	printf("IF -> ID:\n IR: "); print_command(IF_ID.IR); printf("\n");
+	printf("ID -> EX:\n IR: "); print_command(ID_EX.IR); printf("\n A=0x%08x B=0x%08x imm=0x%08x\n", ID_EX.A, ID_EX.B, ID_EX.imm);
+	printf("EX -> MEM:\n IR: "); print_command(EX_MEM.IR); printf("\n ALUOutput=0x%08x\n", EX_MEM.ALUOutput);
+	printf("MEM -> WB:\n IR: "); print_command(MEM_WB.IR); printf("\n ALUOutput=0x%08x LMD=0x%08x\n", MEM_WB.ALUOutput, MEM_WB.LMD);
 }
 
 /***************************************************************/
