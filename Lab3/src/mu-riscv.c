@@ -64,7 +64,7 @@ void mem_write_32(uint32_t address, uint32_t value)
 /***************************************************************/
 void cycle() {
 	handle_pipeline();
-	CURRENT_STATE = NEXT_STATE;
+	NEXT_STATE = CURRENT_STATE;
 	CYCLE_COUNT++;
 }
 
@@ -357,8 +357,8 @@ void WB()
 {
 	uint32_t bincmd = MEM_WB.IR;
 	if (!bincmd) return;
-	uint8_t opcode = GET_OPCODE(bincmd);
-	uint8_t rd = (bincmd >> 7) & BIT_MASK_5;
+	uint8_t opcode = GET_OPCODE(MEM_WB.IR);
+	uint8_t rd = (MEM_WB.IR >> 7) & BIT_MASK_5;
 
 	switch (opcode) {
 		case R_OPCODE:
@@ -390,8 +390,8 @@ void MEM()
 {
 	uint32_t bincmd = EX_MEM.IR;
 	if (!bincmd) { MEM_WB.IR = 0; return; }
-	uint8_t opcode = GET_OPCODE(bincmd);
-	uint8_t funct3 = GET_FUNCT3(bincmd);
+	uint8_t opcode = GET_OPCODE(EX_MEM.IR);
+	uint8_t funct3 = GET_FUNCT3(EX_MEM.IR);
 	MEM_WB.IR = EX_MEM.IR;
 	MEM_WB.ALUOutput = EX_MEM.ALUOutput;
 
@@ -455,9 +455,9 @@ void EX()
 {
 	uint32_t bincmd = ID_EX.IR;
 	if (!bincmd) { EX_MEM.IR = 0; return; }
-	uint8_t opcode = GET_OPCODE(bincmd);
-	uint8_t funct3 = GET_FUNCT3(bincmd);
-	uint8_t funct7 = (bincmd >> 25) & BIT_MASK_7;
+	uint8_t opcode = GET_OPCODE(ID_EX.IR);
+	uint8_t funct3 = GET_FUNCT3(ID_EX.IR);
+	uint8_t funct7 = (ID_EX.IR >> 25) & BIT_MASK_7;
 	EX_MEM.IR = ID_EX.IR;
 	EX_MEM.B = ID_EX.B; //pass b for store instructions
 	switch(opcode) {
@@ -506,45 +506,45 @@ void EX()
 //(0, 1, or 2 reads for jump, addi, or add, respectively)
 void ID()
 {
-		uint8_t bincmd = IF_ID.IR;
+		uint32_t bincmd = IF_ID.IR;
 		if (!bincmd) return;
 		uint8_t opcode = GET_OPCODE(bincmd);
 		uint8_t rs1 =0, rs2 = 0, rd= 0;
 		switch (opcode) {
 			case R_OPCODE: {
-				rd = (bincmd >> 7) & BIT_MASK_5;
-				rs1 = (bincmd >> 15) & BIT_MASK_5;
-				rs2 = (bincmd >> 20) & BIT_MASK_5;
+				rd = (IF_ID.IR >> 7) & BIT_MASK_5;
+				rs1 = (IF_ID.IR >> 15) & BIT_MASK_5;
+				rs2 = (IF_ID.IR >> 20) & BIT_MASK_5;
 				ID_EX.IR = IF_ID.IR;
 				ID_EX.A = CURRENT_STATE.REGS[rs1];
 				ID_EX.B = CURRENT_STATE.REGS[rs2];
 				break;
 			}
 			case IMM_ALU_OPCODE: {
-				uint32_t imm = (bincmd >> 20) & BIT_MASK_12;
+				uint32_t imm = (IF_ID.IR >> 20) & BIT_MASK_12;
 				if(imm & 0x800) imm |= 0xFFFFF000; // sign extend imm
-				uint8_t rs1 = (bincmd >> 15) & BIT_MASK_5;
+				uint8_t rs1 = (IF_ID.IR >> 15) & BIT_MASK_5;
 				ID_EX.IR = IF_ID.IR;
 				ID_EX.A = CURRENT_STATE.REGS[rs1];
 				ID_EX.imm = imm;
 				break;
 			}
 			case LOAD_OPCODE: {
-				uint32_t imm = (bincmd >> 20) & BIT_MASK_12;
+				uint32_t imm = (IF_ID.IR >> 20) & BIT_MASK_12;
 				if (imm & 0x800) imm |= 0xFFFFF000;
-				uint8_t rs1 = (bincmd >> 15) & BIT_MASK_5;
+				uint8_t rs1 = (IF_ID.IR >> 15) & BIT_MASK_5;
 				ID_EX.IR = IF_ID.IR;
 				ID_EX.A = CURRENT_STATE.REGS[rs1];
 				ID_EX.imm = imm;
 				break;
 			}
 			case STORE_OPCODE: {
-				uint8_t imm4 = (bincmd >> 7) & BIT_MASK_5;
-				uint8_t imm11 = (bincmd >> 25) & BIT_MASK_7;
+				uint8_t imm4 = (IF_ID.IR >> 7) & BIT_MASK_5;
+				uint8_t imm11 = (IF_ID.IR >> 25) & BIT_MASK_7;
 				uint32_t imm = (imm11 << 5) | imm4;
 				if(imm & 0x800) imm |= 0xFFFFF000;
-				uint8_t rs1 = (bincmd >> 15) & BIT_MASK_5;
-				uint8_t rs2 = (bincmd >> 20) & BIT_MASK_5;
+				uint8_t rs1 = (IF_ID.IR >> 15) & BIT_MASK_5;
+				uint8_t rs2 = (IF_ID.IR >> 20) & BIT_MASK_5;
 				ID_EX.IR = IF_ID.IR;
 				ID_EX.A = CURRENT_STATE.REGS[rs1];
 				ID_EX.B = CURRENT_STATE.REGS[rs2];
@@ -934,7 +934,7 @@ void print_b_cmd(char* cmd_name, uint8_t rs1, uint8_t rs2, uint16_t imm) {
 /************************************************************/
 void show_pipeline()
 {
-	print("Current PC: 0x%08x\n\n", CURRENT_STATE.PC);
+	printf("Current PC: 0x%08x\n\n", CURRENT_STATE.PC);
 
 	printf("IF -> ID:\n IR: "); print_command(IF_ID.IR); printf("\n");
 	printf("ID -> EX:\n IR: "); print_command(ID_EX.IR); printf("\n A=0x%08x B=0x%08x imm=0x%08x\n", ID_EX.A, ID_EX.B, ID_EX.imm);
